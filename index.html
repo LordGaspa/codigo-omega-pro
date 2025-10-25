@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Código Ômega Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <style>
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .loader { border-top-color: #6366f1; }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-300 font-sans">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const API_BASE_URL = "http://127.0.0.1:8000";
+
+        const STRATEGY_PORTFOLIO = {
+            "BTCUSDT": { "interval": "8h", "params": { "media_rapida_per": 21, "media_lenta_per": 120, "media_filtro_tendencia_per": 150, "atr_periodo": 14, "atr_multiplicador": 2.0 }},
+            "ETHUSDT": { "interval": "12h", "params": { "media_rapida_per": 21, "media_lenta_per": 80, "media_filtro_tendencia_per": 150, "atr_periodo": 10, "atr_multiplicador": 2.5 }},
+            "BCHUSDT": { "interval": "6h", "params": { "media_rapida_per": 9, "media_lenta_per": 80, "media_filtro_tendencia_per": 150, "atr_periodo": 10, "atr_multiplicador": 2.5 }},
+            "BNBUSDT": { "interval": "6h", "params": { "media_rapida_per": 12, "media_lenta_per": 120, "media_filtro_tendencia_per": 150, "atr_periodo": 10, "atr_multiplicador": 2.0 }},
+            "SOLUSDT": { "interval": "8h", "params": { "media_rapida_per": 5, "media_lenta_per": 80, "media_filtro_tendencia_per": 150, "atr_periodo": 10, "atr_multiplicador": 3.0 }},
+            "XRPUSDT": { "interval": "6h", "params": { "media_rapida_per": 21, "media_lenta_per": 60, "media_filtro_tendencia_per": 150, "atr_periodo": 14, "atr_multiplicador": 3.0 }},
+            "DOGEUSDT": { "interval": "6h", "params": { "media_rapida_per": 12, "media_lenta_per": 120, "media_filtro_tendencia_per": 150, "atr_periodo": 10, "atr_multiplicador": 3.0 }},
+            "TRXUSDT": { "interval": "4h", "params": { "media_rapida_per": 21, "media_lenta_per": 100, "media_filtro_tendencia_per": 150, "atr_periodo": 20, "atr_multiplicador": 3.5 }},
+            "LINKUSDT": { "interval": "4h", "params": { "media_rapida_per": 9, "media_lenta_per": 60, "media_filtro_tendencia_per": 200, "atr_periodo": 14, "atr_multiplicador": 3.5 }},
+            "SHIBUSDT": { "interval": "12h", "params": { "media_rapida_per": 21, "media_lenta_per": 60, "media_filtro_tendencia_per": 150, "atr_periodo": 20, "atr_multiplicador": 3.5 }},
+            "SUIUSDT": { "interval": "12h", "params": { "media_rapida_per": 5, "media_lenta_per": 100, "media_filtro_tendencia_per": 150, "atr_periodo": 20, "atr_multiplicador": 3.5 }},
+            "XLMUSDT": { "interval": "12h", "params": { "media_rapida_per": 5, "media_lenta_per": 60, "media_filtro_tendencia_per": 150, "atr_periodo": 20, "atr_multiplicador": 2.5 }},
+            "AVAXUSDT": { "interval": "12h", "params": { "media_rapida_per": 5, "media_lenta_per": 100, "media_filtro_tendencia_per": 150, "atr_periodo": 20, "atr_multiplicador": 2.0 }},
+            "TAOUSDT": { "interval": "12h", "params": { "media_rapida_per": 21, "media_lenta_per": 60, "media_filtro_tendencia_per": 250, "atr_periodo": 10, "atr_multiplicador": 2.5 }},
+            "FETUSDT": { "interval": "6h", "params": { "media_rapida_per": 15, "media_lenta_per": 120, "media_filtro_tendencia_per": 200, "atr_periodo": 10, "atr_multiplicador": 3.5 }},
+            "WLDUSDT": { "interval": "8h", "params": { "media_rapida_per": 9, "media_lenta_per": 80, "media_filtro_tendencia_per": 150, "atr_periodo": 14, "atr_multiplicador": 3.0 }},
+            "ADAUSDT": { "interval": "12h", "params": { "media_rapida_per": 21, "media_lenta_per": 80, "media_filtro_tendencia_per": 200, "atr_periodo": 14, "atr_multiplicador": 2.0 }},
+                        // [ATUALIZADO] Estratégia CAMPEÃ para HBARUSDT (8 Horas)
+            "HBARUSDT": { "interval": "8h", "params": { "media_rapida_per": 21, "media_lenta_per": 120, 
+            "media_filtro_tendencia_per": 200, "atr_periodo": 10, "atr_multiplicador": 3.5 }},
+                        // [NOVO] Estratégia otimizada para UNIUSDT
+            "UNIUSDT": { "interval": "12h", "params": { "media_rapida_per": 12, "media_lenta_per": 120, 
+            "media_filtro_tendencia_per": 150, "atr_periodo": 14, "atr_multiplicador": 3.5 }},
+            // [NOVO] Estratégia otimizada para NEARUSDT
+            "NEARUSDT": { "interval": "6h", "params": { "media_rapida_per": 5, "media_lenta_per": 120, 
+            "media_filtro_tendencia_per": 150, "atr_periodo": 10, "atr_multiplicador": 2.0 }},
+                        // [NOVO] Estratégia otimizada para SANDUSDT
+            "SANDUSDT": { "interval": "12h", "params": { "media_rapida_per": 12, "media_lenta_per": 100, 
+            "media_filtro_tendencia_per": 250, "atr_periodo": 10, "atr_multiplicador": 2.5 }},
+                       // [NOVO] Estratégia otimizada para AXSUSDT
+            "AXSUSDT": { "interval": "8h", "params": { "media_rapida_per": 5, "media_lenta_per": 100, 
+            "media_filtro_tendencia_per": 200, "atr_periodo": 10, "atr_multiplicador": 3.5 }},
+            // [NOVO] Estratégia otimizada para INJUSDT
+            "INJUSDT": { "interval": "8h", "params": { "media_rapida_per": 21, "media_lenta_per": 100, 
+            "media_filtro_tendencia_per": 150, "atr_periodo": 14, "atr_multiplicador": 3.5 }},
+                        // [NOVO] Estratégia otimizada para RNDRUSDT
+            "RNDRUSDT": { "interval": "6h", "params": { "media_rapida_per": 12, "media_lenta_per": 100, 
+            "media_filtro_tendencia_per": 200, "atr_periodo": 10, "atr_multiplicador": 3.0 }},
+                        // [NOVO] Estratégia otimizada para CAKEUSDT
+            "CAKEUSDT": { "interval": "6h", "params": { "media_rapida_per": 15, "media_lenta_per": 60, 
+            "media_filtro_tendencia_per": 150, "atr_periodo": 10, "atr_multiplicador": 2.5 }},
+
+        };
+        
+        // ... (o restante do código do index.html permanece o mesmo) ...
+        const formatPrice = (price) => {
+            if (price === null || price === undefined) return 'N/A';
+            if (price < 0.01) return `$${price.toFixed(8)}`;
+            if (price < 1) return `$${price.toFixed(4)}`;
+            return `$${price.toFixed(2)}`;
+        };
+        const SignalCard = ({ signalData, onSelect, isSelected }) => {
+            const { ativo, sinal, data_sinal, risco_pct, preco_atual, variacao_pct, stop_sugerido, preco_no_sinal } = signalData;
+            const formattedDate = data_sinal ? new Date(data_sinal).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit'}) : '—';
+            let displaySinal = sinal;
+            let signalColorClass = 'text-slate-400';
+            if (sinal === 'COMPRA') {
+                displaySinal = 'ALTA';
+                signalColorClass = 'text-green-400';
+            } else if (sinal === 'VENDA') {
+                displaySinal = 'BAIXA';
+                signalColorClass = 'text-red-400';
+            }
+            const variationColor = variacao_pct >= 0 ? 'text-green-400' : 'text-red-400';
+            const borderClass = isSelected ? 'border-indigo-500 ring-2 ring-indigo-500' : 'border-slate-700 hover:border-indigo-500';
+            return (
+                <div className={`bg-slate-800/60 p-4 rounded-lg border ${borderClass} transition-all duration-300 transform hover:-translate-y-1 cursor-pointer flex flex-col justify-between min-h-[180px]`} onClick={() => onSelect(ativo)}>
+                    <div>
+                        <div className="flex justify-between items-start">
+                            <h3 className="text-lg font-bold text-white">{ativo}</h3>
+                            <span className={`font-bold text-md ${signalColorClass}`}>{displaySinal}</span>
+                        </div>
+                        <div className="mt-3 space-y-1.5 text-xs text-slate-400">
+                            <div className="flex justify-between"><span>Preço Atual:</span><span className="font-mono text-white">{formatPrice(preco_atual)}</span></div>
+                            <div className="flex justify-between"><span>Preço no Sinal:</span><span className="font-mono text-white">{formatPrice(preco_no_sinal)}</span></div>
+                            <div className="flex justify-between"><span>Data do Sinal:</span><span className="font-mono text-white">{formattedDate}</span></div>
+                            <div className="flex justify-between"><span>Variação:</span><span className={`font-mono font-semibold ${variationColor}`}>{variacao_pct ? `${variacao_pct.toFixed(2)}%` : 'N/A'}</span></div>
+                        </div>
+                    </div>
+                    {sinal === 'COMPRA' && (
+                        <div className="mt-3 pt-2 border-t border-slate-700 space-y-1.5 text-xs">
+                             <div className="flex justify-between text-slate-400"><span>Stop Sugerido:</span><span className="font-mono text-amber-400">{formatPrice(stop_sugerido)}</span></div>
+                             <div className="flex justify-between text-slate-400"><span>Risco da Entrada:</span><span className="font-mono text-amber-400">{risco_pct ? `${risco_pct.toFixed(2)}%` : '0.00%'}</span></div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+        const LoadingSpinner = ({ text }) => (
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+                <div className="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mb-4 animate-spin"></div>
+                <p className="text-xl text-slate-400">{text}</p>
+            </div>
+        );
+        const ErrorMessage = ({ message }) => (<div className="text-center text-red-400 bg-red-900/50 p-6 rounded-lg">{message}</div>);
+        const Header = () => (
+            <header className="bg-slate-800/50 backdrop-blur-sm p-4 border-b border-slate-700 sticky top-0 z-20">
+                <div className="container mx-auto flex items-center">
+                    <svg className="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    <h1 className="text-2xl font-bold text-white tracking-tight ml-3">Código Ômega <span className="text-indigo-400">Pro</span></h1>
+                </div>
+            </header>
+        );
+        const RadarGrid = ({ onSelect, selectedAsset }) => {
+            const [signals, setSignals] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null);
+            useEffect(() => {
+                const fetchSignals = async () => {
+                    try {
+                        const assets = Object.keys(STRATEGY_PORTFOLIO);
+                        const signalPromises = assets.map(asset => {
+                            const { interval, params } = STRATEGY_PORTFOLIO[asset];
+                            return fetch(`${API_BASE_URL}/signal/${asset}?interval=${interval}`, {
+                                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(params)
+                            }).then(res => res.json());
+                        });
+                        const results = await Promise.all(signalPromises);
+                        results.sort((a, b) => new Date(b.data_sinal) - new Date(a.data_sinal));
+                        setSignals(results);
+                    } catch (err) { setError("Falha ao comunicar com a API de Sinais. Verifique se o backend (main.py) está rodando.");
+                    } finally { setLoading(false); }
+                };
+                fetchSignals();
+            }, []);
+            if (loading) return <LoadingSpinner text="Carregando Sinais do Portfólio..." />;
+            if (error) return <ErrorMessage message={error} />;
+            return (
+                <div className="p-4 md:p-6 fade-in">
+                    <h2 className="text-3xl font-bold text-white mb-6">📡 Radar de Sinais</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
+                        {signals.map(s => <SignalCard key={s.ativo} signalData={s} onSelect={onSelect} isSelected={selectedAsset === s.ativo} />)}
+                    </div>
+                </div>
+            );
+        };
+        const PerformanceChart = ({ omegaHistory, bhHistory }) => {
+            const chartRef = useRef(null);
+            useEffect(() => {
+                if (!chartRef.current || !omegaHistory || !bhHistory) return;
+                const ctx = chartRef.current.getContext('2d');
+                const chartInstance = new Chart(ctx, {
+                    type: 'line', data: {
+                        datasets: [
+                            {
+                                label: 'Código Ômega', data: omegaHistory.map(item => ({ x: new Date(item.timestamp), y: item.capital })),
+                                borderColor: '#34d399', backgroundColor: 'rgba(52, 211, 153, 0.2)',
+                                borderWidth: 2, pointRadius: 0, fill: true,
+                            },
+                            {
+                                label: 'Buy & Hold', data: bhHistory.map(item => ({ x: new Date(item.timestamp), y: item.capital })),
+                                borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.2)',
+                                borderWidth: 2, pointRadius: 0, fill: true,
+                            }
+                        ]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, scales: {
+                        x: { type: 'time', time: { unit: 'year' }, grid: { color: 'rgba(255, 255, 255, 0.1)' }, ticks: { color: '#94a3b8' }},
+                        y: { grid: { color: 'rgba(255, 255, 255, 0.1)' }, ticks: { color: '#94a3b8', callback: (value) => `$${(value / 1000)}k` }}
+                    }, plugins: { legend: { labels: { color: '#cbd5e1' }}}}
+                });
+                return () => chartInstance.destroy();
+            }, [omegaHistory, bhHistory]);
+            return <div className="h-96"><canvas ref={chartRef}></canvas></div>;
+        };
+        const MetricsPanel = ({ metrics }) => (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-2 gap-4 text-center">
+                <div className="bg-slate-700/50 p-4 rounded-lg">
+                    <div className="text-sm text-slate-400">Retorno Ômega</div>
+                    <div className="text-2xl font-bold text-green-400">{metrics.retorno_estrategia_pct.toFixed(2)}%</div>
+                </div>
+                <div className="bg-slate-700/50 p-4 rounded-lg">
+                    <div className="text-sm text-slate-400">Retorno B&H</div>
+                    <div className="text-2xl font-bold text-amber-400">{metrics.retorno_bh_pct.toFixed(2)}%</div>
+                </div>
+                <div className="bg-slate-700/50 p-4 rounded-lg">
+                    <div className="text-sm text-slate-400">Nº de Trades</div>
+                    <div className="text-2xl font-bold text-white">{metrics.num_ciclos}</div>
+                </div>
+                <div className="bg-slate-700/50 p-4 rounded-lg">
+                    <div className="text-sm text-slate-400">Taxa de Acerto</div>
+                    <div className="text-2xl font-bold text-white">{metrics.win_rate_pct.toFixed(2)}%</div>
+                </div>
+                <div className="bg-slate-700/50 p-4 rounded-lg col-span-2 md:col-start-3 lg:col-span-2">
+                    <div className="text-sm text-slate-400">Max Drawdown</div>
+                    <div className="text-2xl font-bold text-red-400">{metrics.max_drawdown_pct.toFixed(2)}%</div>
+                </div>
+            </div>
+        );
+        const TradesList = ({ trades }) => (
+             <div className="max-h-80 overflow-y-auto mt-6">
+                <table className="w-full text-sm text-left text-slate-400">
+                    <thead className="text-xs text-slate-300 uppercase bg-slate-700/50 sticky top-0">
+                        <tr>
+                            <th scope="col" className="px-4 py-3">Compra</th> <th scope="col" className="px-4 py-3">Venda</th>
+                            <th scope="col" className="px-4 py-3">Resultado</th> <th scope="col" className="px-4 py-3">Capital Final</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {trades.map((trade, index) => (
+                            <tr key={index} className="border-b border-slate-700 hover:bg-slate-800">
+                                <td className="px-4 py-2">{new Date(trade['Data Compra']).toLocaleDateString('pt-BR')}</td>
+                                <td className="px-4 py-2">{new Date(trade['Data Venda']).toLocaleDateString('pt-BR')}</td>
+                                <td className={`px-4 py-2 font-semibold ${trade['Resultado (%)'] >= 0 ? 'text-green-400' : 'text-red-400'}`}>{trade['Resultado (%)'].toFixed(2)}%</td>
+                                <td className="px-4 py-2 font-mono">${trade['Capital Acumulado'].toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        );
+        const DetailedAnalysis = ({ asset }) => {
+            const [backtestData, setBacktestData] = useState(null);
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState(null);
+            useEffect(() => {
+                if (!asset) return;
+                const fetchBacktest = async () => {
+                    setLoading(true); setError(null); setBacktestData(null);
+                    try {
+                        const { interval, params } = STRATEGY_PORTFOLIO[asset];
+                        const response = await fetch(`${API_BASE_URL}/backtest/${asset}?interval=${interval}`, {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(params)
+                        });
+                        if (!response.ok) throw new Error('A resposta da API não foi bem-sucedida.');
+                        const data = await response.json(); setBacktestData(data);
+                    } catch (err) {
+                        setError(`Falha ao carregar análise para ${asset}.`); console.error(err);
+                    } finally { setLoading(false); }
+                };
+                fetchBacktest();
+            }, [asset]);
+            if (!asset) return (<div className="bg-slate-800/60 p-8 rounded-lg border border-slate-700 text-center text-slate-500 h-full flex items-center justify-center min-h-[30rem]"><p>Selecione um ativo no radar para ver a análise completa aqui.</p></div>);
+            if (loading) return (<div className="bg-slate-800/60 p-8 rounded-lg border border-slate-700 flex items-center justify-center h-full min-h-[30rem]"><div className="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 animate-spin"></div></div>);
+            if (error) return <ErrorMessage message={error} />;
+            if (!backtestData) return null;
+            return (
+                 <div className="bg-slate-800/60 p-6 rounded-lg border border-slate-700 fade-in">
+                    <h3 className="text-2xl font-bold text-white mb-4">Análise de Performance: {asset}</h3>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="lg:col-span-2">
+                           <PerformanceChart omegaHistory={backtestData.historico_capital} bhHistory={backtestData.historico_capital_bh} />
+                        </div>
+                        <div>
+                           <MetricsPanel metrics={backtestData.metricas} />
+                        </div>
+                    </div>
+                    <h3 className="text-2xl font-bold text-white mt-8 mb-4">Histórico de Trades</h3>
+                    <TradesList trades={backtestData.lista_trades} />
+                 </div>
+            );
+        };
+        const App = () => {
+            const [selectedAsset, setSelectedAsset] = useState(null);
+            return (
+                <div className="fade-in">
+                    <Header />
+                    <main className="container mx-auto mt-4 pb-10">
+                       <RadarGrid onSelect={setSelectedAsset} selectedAsset={selectedAsset} />
+                       <div className="p-4 md:p-6 mt-8">
+                           <h2 className="text-3xl font-bold text-white mb-6">🔎 Análise Detalhada</h2>
+                           <DetailedAnalysis asset={selectedAsset} />
+                       </div>
+                    </main>
+                </div>
+            );
+        };
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
+        root.render(<App />);
+    </script>
+</body>
+</html>
